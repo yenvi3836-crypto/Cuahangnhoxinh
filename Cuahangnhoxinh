@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Bán Hàng Thời Trang - Style Savvy</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #fce4ec;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 800px;
+      height: 500px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      border-radius: 15px;
+      overflow: hidden;
+      background: #fff;
+    }
+    canvas {
+      display: block;
+      background: #f8bbd0;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      z-index: 10;
+    }
+    .overlay h1 {
+      font-size: 48px;
+      margin-bottom: 10px;
+      color: #ff4081;
+      text-shadow: 2px 2px 4px #000;
+    }
+    .overlay p {
+      font-size: 18px;
+      margin-bottom: 20px;
+      text-align: center;
+      max-width: 80%;
+    }
+    .btn {
+      padding: 12px 30px;
+      font-size: 20px;
+      font-weight: bold;
+      background: #ff4081;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: #e91e63;
+      transform: scale(1.05);
+    }
+    /* Băng rôn Victory */
+    #victory-banner {
+      display: none;
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(45deg, #ff1744, #ff4081, #ff9100);
+      color: #fff;
+      padding: 15px 50px;
+      font-size: 36px;
+      font-weight: 900;
+      border-radius: 50px;
+      box-shadow: 0 0 20px #ffea00;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      z-index: 5;
+      animation: bounce 0.6s infinite alternate;
+      border: 4px solid #fff;
+    }
+    @keyframes bounce {
+      from { transform: translateX(-50%) translateY(0); }
+      to { transform: translateX(-50%) translateY(-15px); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <div id="victory-banner">🎉 VICTORY! 🎉</div>
+
+  <!-- Bảng bắt đầu -->
+  <div id="start-screen" class="overlay">
+    <h1>STYLE SAVVY SHOP</h1>
+    <p>Phục vụ khách hàng bằng cách chọn đúng món đồ họ yêu cầu trước khi họ tức giận bỏ đi!</p>
+    <button class="btn" onclick="startGame()">BẮT ĐẦU CHƠI</button>
+  </div>
+
+  <!-- Bảng Thắng / Thua -->
+  <div id="game-over-screen" class="overlay" style="display: none;">
+    <h1 id="game-over-title">GAME OVER</h1>
+    <p id="game-over-msg">Khách hàng đã tức giận bỏ đi!</p>
+    <button class="btn" onclick="restartGame()">CHƠI LẠI</button>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="500"></canvas>
+</div>
+
+<!-- Nhạc nền từ video Style Savvy: Fashion Forward -->
+<audio id="bgm" loop>
+  <source src="https://v16m-default.akamaized.net/0a40a4cf02ca959d2a02b1fbb2eb00d0/66184a44/video/tos/useast2a/tos-useast2a-ve-0068c001/oQJBE4E2AAn1I6f1Fffs13I8LCA0CgQoQE0EgQ/?a=0&ch=0&cr=0&dr=0&lr=all&cd=0%7C0%7C0%7C0&cv=1&br=128&bt=64&cs=0&ds=3&ft=endcards&mime_type=audio_mp4&qs=0&rc=Mzg4N2k6ZnM3NDMzODczNEApMzg4N2k6ZnM3NDMzODczNEBlNWNfL2RhcTFgLS1kMTNzYSNlNWNfL2RhcTFgLS1kMTNzLzY%3D" type="audio/mp4">
+  <!-- Audio fallback nếu link trên hết hạn -->
+  <source src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=cute-creature-112343.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const bgm = document.getElementById('bgm');
+
+// Khai báo sản phẩm
+const PRODUCTS = [
+  { id: 'dress', name: 'Váy Mới', icon: '👗', color: '#ff4081' },
+  { id: 'hat', name: 'Mũ Sành Điệu', icon: '👒', color: '#8e24aa' },
+  { id: 'shoes', name: 'Giày Cao Gót', icon: '👠', color: '#e53935' },
+  { id: 'bag', name: 'Túi Xách', icon: '👜', color: '#ffb300' }
+];
+
+// Trạng thái Game
+let score = 0;
+let level = 1;
+let targetScore = 5;
+let currentCustomer = null;
+let fireworks = [];
+let particles = [];
+let isGameOver = false;
+let isVictory = false;
+let customerTimer = null;
+
+class Customer {
+  constructor(difficulty) {
+    this.x = -100;
+    this.y = 220;
+    this.targetX = 350;
+    this.speed = 4;
+    // Độ khó càng cao, thời gian kiên nhẫn càng ngắn
+    this.maxPatience = Math.max(150, 400 - (difficulty * 35));
+    this.patience = this.maxPatience;
+    this.desiredProduct = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
+    this.state = 'walking_in'; // walking_in, waiting, angry_leaving, happy_leaving
+    this.mood = '😊';
+  }
+
+  update() {
+    if (this.state === 'walking_in') {
+      this.x += this.speed;
+      if (this.x >= this.targetX) {
+        this.x = this.targetX;
+        this.state = 'waiting';
+      }
+    } else if (this.state === 'waiting') {
+      this.patience -= 1;
+      if (this.patience < this.maxPatience * 0.3) {
+        this.mood = '😠';
+      }
+      if (this.patience <= 0) {
+        this.state = 'angry_leaving';
+        this.mood = '😡';
+        triggerGameOver("Khách hàng quá tức giận vì chờ lâu và đã bỏ đi!");
+      }
+    } else if (this.state === 'angry_leaving' || this.state === 'happy_leaving') {
+      this.x += this.speed * 1.5;
+    }
+  }
+
+  draw() {
+    // Vẽ nhân vật khách hàng (Stylized 2D avatar)
+    ctx.save();
+    ctx.font = '70px serif';
+    ctx.fillText(this.mood, this.x, this.y + 40);
+
+    // Vẽ bóng thoại yêu cầu
+    if (this.state === 'waiting' || this.state === 'walking_in') {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.roundRect(this.x + 50, this.y - 80, 100, 60, 10);
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Món đồ yêu cầu
+      ctx.font = '35px serif';
+      ctx.fillText(this.desiredProduct.icon, this.x + 80, this.y - 38);
+    }
+
+    // Vẽ thanh kiên nhẫn
+    if (this.state === 'waiting') {
+      let pct = this.patience / this.maxPatience;
+      ctx.fillStyle = '#e0e0e0';
+      ctx.fillRect(this.x - 10, this.y - 100, 100, 10);
+      ctx.fillStyle = pct > 0.4 ? '#4caf50' : '#f44336';
+      ctx.fillRect(this.x - 10, this.y - 100, 100 * pct, 10);
+    }
+    ctx.restore();
+  }
+}
+
+// Bắt đầu game
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('game-over-screen').style.display = 'none';
+  document.getElementById('victory-banner').style.display = 'none';
+  
+  bgm.currentTime = 0;
+  bgm.play().catch(e => console.log("Audio play blocked:", e));
+
+  score = 0;
+  level = 1;
+  targetScore = 5;
+  isGameOver = false;
+  isVictory = false;
+  fireworks = [];
+  
+  spawnCustomer();
+  gameLoop();
+}
+
+function spawnCustomer() {
+  if (isGameOver || isVictory) return;
+  currentCustomer = new Customer(level);
+}
+
+// Xử lý khi chọn mua đồ
+function serveProduct(product) {
+  if (!currentCustomer || currentCustomer.state !== 'waiting' || isGameOver) return;
+
+  if (product.id === currentCustomer.desiredProduct.id) {
+    // Phục vụ đúng
+    score++;
+    currentCustomer.state = 'happy_leaving';
+    currentCustomer.mood = '🥰';
+
+    // Tăng Level khi đủ điểm
+    if (score >= targetScore) {
+      if (level >= 3) {
+        triggerVictory();
+        return;
+      } else {
+        level++;
+        targetScore += level * 5;
+      }
+    }
+
+    setTimeout(spawnCustomer, 1000);
+  } else {
+    // Phục vụ sai mòn đồ -> Khách tức giận
+    currentCustomer.state = 'angry_leaving';
+    currentCustomer.mood = '😡';
+    triggerGameOver("Bạn đã đưa sai món đồ! Khách hàng giận dữ bỏ đi.");
+  }
+}
+
+// Thua cuộc
+function triggerGameOver(reason) {
+  isGameOver = true;
+  document.getElementById('game-over-title').innerText = "GAME OVER 😡";
+  document.getElementById('game-over-title').style.color = "#d32f2f";
+  document.getElementById('game-over-msg').innerText = reason;
+  document.getElementById('game-over-screen').style.display = 'flex';
+}
+
+// Thắng cuộc (Victory + Pháo hoa)
+function triggerVictory() {
+  isVictory = true;
+  document.getElementById('victory-banner').style.display = 'block';
+  document.getElementById('game-over-title').innerText = "VICTORY! 🏆";
+  document.getElementById('game-over-title').style.color = "#4caf50";
+  document.getElementById('game-over-msg').innerText = "Chúc mừng! Bạn là quản lý cửa hàng xuất sắc nhất!";
+  
+  setTimeout(() => {
+    document.getElementById('game-over-screen').style.display = 'flex';
+  }, 4000);
+
+  // Tạo hiệu ứng pháo hoa
+  createFireworks();
+}
+
+// Hiệu ứng pháo hoa
+function createFireworks() {
+  if (!isVictory) return;
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      let x = Math.random() * canvas.width;
+      let y = Math.random() * (canvas.height / 2);
+      let colors = ['#ff4081', '#00e676', '#ffea00', '#00e5ff', '#d500f9'];
+      for (let p = 0; p < 50; p++) {
+        fireworks.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1,
+          size: Math.random() * 4 + 2
+        });
+      }
+    }, i * 400);
+  }
+  if (isVictory) setTimeout(createFireworks, 2000);
+}
+
+function updateFireworks() {
+  for (let i = fireworks.length - 1; i >= 0; i--) {
+    let p = fireworks[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -= 0.015;
+    if (p.alpha <= 0) {
+      fireworks.splice(i, 1);
+    }
+  }
+}
+
+function drawFireworks() {
+  fireworks.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// Vẽ kệ hàng
+function drawUI() {
+  // Thanh thông tin trên cùng
+  ctx.fillStyle = '#fff0f5';
+  ctx.fillRect(0, 0, canvas.width, 60);
+  ctx.fillStyle = '#880e4f';
+  ctx.font = 'bold 20px Segoe UI';
+  ctx.fillText(`Điểm: ${score} / ${targetScore}`, 30, 38);
+  ctx.fillText(`Level: ${level}`, 350, 38);
+
+  // Quầy bán hàng
+  ctx.fillStyle = '#d7ccc8';
+  ctx.fillRect(0, 350, canvas.width, 150);
+  ctx.fillStyle = '#8d6e63';
+  ctx.fillRect(0, 340, canvas.width, 10);
+
+  // Vẽ nút chọn sản phẩm trên quầy
+  PRODUCTS.forEach((prod, idx) => {
+    let x = 100 + idx * 170;
+    let y = 370;
+    
+    // Nút bấm sản phẩm
+    ctx.fillStyle = prod.color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, 120, 100, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Icon sản phẩm
+    ctx.font = '40px serif';
+    ctx.fillText(prod.icon, x + 40, y + 55);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText(prod.name, x + 60, y + 85);
+    ctx.textAlign = 'left';
+  });
+}
+
+// Xử lý Click chọn sản phẩm
+canvas.addEventListener('click', (e) => {
+  let rect = canvas.getBoundingClientRect();
+  let clickX = e.clientX - rect.left;
+  let clickY = e.clientY - rect.top;
+
+  if (clickY >= 370 && clickY <= 470) {
+    PRODUCTS.forEach((prod, idx) => {
+      let x = 100 + idx * 170;
+      if (clickX >= x && clickX <= x + 120) {
+        serveProduct(prod);
+      }
+    });
+  }
+});
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Cửa hàng / Hình nền
+  ctx.fillStyle = '#f8bbd0';
+  ctx.fillRect(0, 60, canvas.width, 290);
+
+  // Cập nhật và vẽ Khách hàng
+  if (currentCustomer) {
+    currentCustomer.update();
+    currentCustomer.draw();
+  }
+
+  // Vẽ UI quầy hàng
+  drawUI();
+
+  // Hiệu ứng pháo hoa chiến thắng
+  if (fireworks.length > 0) {
+    updateFireworks();
+    drawFireworks();
+  }
+
+  if (!isGameOver || isVictory) {
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+function restartGame() {
+  startGame();
+}
+</script>
+</body>
+</html>
